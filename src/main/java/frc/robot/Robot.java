@@ -4,6 +4,7 @@
 
 package frc.robot;
 
+import edu.wpi.first.networktables.*;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.SpeedControllerGroup;
@@ -52,6 +53,16 @@ public class Robot extends TimedRobot {
   private TalonSRX m_climber;
   private final Timer m_timer = new Timer();
   private TalonFX m_testSwerve;
+  private NetworkTable m_ntwktbl;
+  private double m_limelight_target;
+  private double m_limelight_tx;
+  private double m_limelight_ty;
+  private double m_limelight_tz;
+  private float KpAim = -0.1f;
+  private float KpDistance = -0.1f;
+  private float min_aim_command = 0.05f;
+  private float right_command=0.0f;
+  private float left_command=0.0f;
   
     /* The orchestra object that holds all the instruments */
   Orchestra _orchestra;
@@ -116,6 +127,8 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotInit() {
+    m_ntwktbl = NetworkTableInstance.getDefault().getTable("limelight");
+   
     m_LeftFrontMotor = new CANSparkMax(2, MotorType.kBrushless);
     m_LeftRearMotor = new CANSparkMax(3, MotorType.kBrushless);
     m_RightFrontMotor = new CANSparkMax(1, MotorType.kBrushless);
@@ -234,49 +247,31 @@ public class Robot extends TimedRobot {
       }
 
   }
-  @Override
-  public void autonomousInit() {
-    m_timer.reset();
-    m_timer.start();
-  }
+  
   @Override
   public void autonomousPeriodic() {
+    m_limelight_target = m_ntwktbl.getEntry("tv").getDouble(0);
+    m_limelight_tx = m_ntwktbl.getEntry("tx").getDouble(0);
+    m_limelight_ty = m_ntwktbl.getEntry("ty").getDouble(0);
+    m_limelight_tz = m_ntwktbl.getEntry("tz").getDouble(0);
+
     // Drive for 2 seconds
-    if (m_timer.get() < 1.0) 
-    {
-      m_myRobot.tankDrive(0.5, 0.5); // drive forwards half speed
-    } 
-    else if (m_timer.get() < 1.2)
-    {
-      m_myRobot.tankDrive(-0.5, -0.5); // stop robot
+    double heading_error = -m_limelight_tx;
+    double distance_error=-m_limelight_ty;
+    double steering_adjust=0.0;
+    if(m_limelight_tx>1.0){
+      steering_adjust=KpAim*heading_error-min_aim_command;
     }
-    else if (m_timer.get() < 2.5) 
-    {
-      m_myRobot.tankDrive(0.5, 0.5); // drive forwards half speed
-    } 
-    else if (m_timer.get() < 3.0) 
-    {
-      m_myRobot.stopMotor(); // stop robot
+    else if(m_limelight_tx<1.0){
+      steering_adjust=KpAim*heading_error+min_aim_command;
     }
-    else if (m_timer.get() < 4.0) 
-    {
-      m_myRobot.tankDrive(-0.5, -0.5); // drive forwards half speed
-    } 
-    else if (m_timer.get() < 4.5) 
-    {
-      m_myRobot.stopMotor(); // stop robot
-    }
-    else if (m_timer.get() < 5.5) 
-    {
-      m_myRobot.tankDrive(-0.5, -0.5); // drive forwards half speed
-    } 
-    else if (m_timer.get() < 6.0) 
-    {
-      m_myRobot.stopMotor(); // stop robot
-    }
-    else 
-    {
-      m_myRobot.stopMotor(); // stop robot
-    }
+    double distance_adjust=KpDistance*distance_error;
+
+    left_command+=steering_adjust+distance_adjust;
+    right_command+=steering_adjust+distance_adjust;
+    System.out.print(left_command);
+    System.out.print(right_command);
+
+    m_myRobot.tankDrive(0.03*left_command, 0.03*right_command);
   }
 }
